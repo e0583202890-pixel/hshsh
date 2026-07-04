@@ -44,19 +44,31 @@ Three top-level workflows:
 - Optional: **NVIDIA CUDA** (RTX GPU) for fast Whisper + NVENC encoding
 - Optional: **tesseract** for the experimental kill-feed OCR
 
-## Install & run (Windows)
+## Install & run (Windows) — the easy way
+
+**Double-click `start.bat`.** That's it.
+
+On the first run it installs everything and builds the app (a few minutes), then
+every run after that starts in seconds and **opens your browser automatically** at:
+
+- **http://127.0.0.1:8123**  (one address — the backend serves the UI and the API)
+
+Keep the black window open while you use the app; close it to stop. If Python or
+Node.js is missing, `start.bat` tells you exactly what to install and where.
+
+### Developer alternative (hot-reload)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File run.ps1
 ```
 
-`run.ps1` creates a Python venv, installs backend + frontend dependencies on
-first run, copies `.env.example` to `.env` if missing, then starts:
+`run.ps1` runs the backend (http://127.0.0.1:8123) plus the Vite dev server with
+hot-reload (http://127.0.0.1:5173).
 
-- Backend (FastAPI): http://127.0.0.1:8123
-- Frontend (Vite dev): http://127.0.0.1:5173
+### Your AI key
 
-Put your AI key in `.env` (never echoed to the UI). Two options — set **either**:
+Put your AI key in `.env` (never echoed to the UI). `start.bat` creates `.env` and
+opens it in Notepad on the first run. Set **either**:
 
 - `OPENROUTER_API_KEY` (+ optional `OPENROUTER_MODEL`) — one key, many models. The
   default `deepseek/deepseek-chat` (DeepSeek V3) is a **cheap** pick (~40-50x
