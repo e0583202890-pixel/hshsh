@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Clip, Source, Streamer
 from ..queue import queue
-from ..schemas import (AudioIn, BrandIn, CaptionsIn, ClipIn, ClipOut, EffectsIn,
-                       ExportIn, TranscriptPatchIn, VerticalIn)
+from ..schemas import (AudioIn, BrandIn, CaptionsIn, ClipIn, ClipOut, ClipUpdateIn,
+                       EffectsIn, ExportIn, TranscriptPatchIn, VerticalIn)
 from ..services.ai_clipper import content_hash
 from ..services.captions import clip_transcript
 from ..services.transcribe import transcribe_source
@@ -51,6 +51,24 @@ def get_clip(clip_id: int, db: Session = Depends(get_db)):
     clip = db.get(Clip, clip_id)
     if not clip:
         raise HTTPException(404, "Clip not found")
+    return clip
+
+
+@router.patch("/clips/{clip_id}", response_model=ClipOut)
+def update_clip(clip_id: int, body: ClipUpdateIn, db: Session = Depends(get_db)):
+    clip = db.get(Clip, clip_id)
+    if not clip:
+        raise HTTPException(404, "Clip not found")
+    if body.title is not None:
+        clip.title = body.title
+    if body.start_sec is not None:
+        clip.start_sec = body.start_sec
+    if body.end_sec is not None:
+        clip.end_sec = body.end_sec
+    if clip.end_sec <= clip.start_sec:
+        raise HTTPException(400, "end_sec must be greater than start_sec")
+    clip.duration_sec = clip.end_sec - clip.start_sec
+    db.commit()
     return clip
 
 

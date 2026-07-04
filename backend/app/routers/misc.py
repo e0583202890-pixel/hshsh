@@ -80,12 +80,15 @@ async def autoclip(body: AutoClipIn, db: Session = Depends(get_db)):
         db.commit()
         source_id = src.id
         dl_job = await queue.enqueue("download", {"url": body.url, "quality": "best",
-                                                  "source_id": source_id},
+                                                  "source_id": source_id,
+                                                  "then_autoclip": True, "n": body.n,
+                                                  "exclusions": body.exclusions,
+                                                  "brandkit_id": body.brandkit_id,
+                                                  "preset_id": body.preset_id},
                                      source_id=source_id)
-        # The autoclip job will fail fast if the download hasn't finished;
-        # for URL flow the operator runs autoclip after download completes.
+        # Download runs first; Auto-Clip is chained automatically on completion.
         return {"source_id": source_id, "download_job_id": dl_job,
-                "note": "Run auto-clip again on this source after the download finishes"}
+                "note": "Downloading first - Auto-Clip will start automatically when it finishes"}
     if not source_id:
         raise HTTPException(400, "Provide source_id or url")
     job_id = await queue.enqueue("autoclip", {"source_id": source_id, "n": body.n,

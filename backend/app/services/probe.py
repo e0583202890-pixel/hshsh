@@ -11,12 +11,18 @@ from ..config import settings
 async def probe(path: str | Path) -> dict:
     cmd = [settings.which("ffprobe") or "ffprobe", "-v", "quiet", "-print_format", "json",
            "-show_format", "-show_streams", str(path)]
-    proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
-                                                stderr=asyncio.subprocess.DEVNULL)
-    out, _ = await proc.communicate()
+    try:
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
+                                                    stderr=asyncio.subprocess.DEVNULL)
+        out, _ = await proc.communicate()
+    except (FileNotFoundError, OSError):
+        return {}  # ffprobe not installed - callers degrade gracefully
     if proc.returncode != 0:
         return {}
-    data = json.loads(out or b"{}")
+    try:
+        data = json.loads(out or b"{}")
+    except json.JSONDecodeError:
+        return {}
     info: dict = {"duration_sec": None, "width": None, "height": None, "fps": None, "has_audio": False}
     fmt = data.get("format", {})
     if fmt.get("duration"):

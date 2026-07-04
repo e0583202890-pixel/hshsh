@@ -127,6 +127,12 @@ class ClipIn(BaseModel):
     brandkit_id: Optional[int] = None
 
 
+class ClipUpdateIn(BaseModel):
+    title: Optional[str] = None
+    start_sec: Optional[float] = None
+    end_sec: Optional[float] = None
+
+
 class VerticalIn(BaseModel):
     mode: str  # facecam_stack|blur_fill|auto_reframe|center_crop|letterbox
     params: dict[str, Any] = {}

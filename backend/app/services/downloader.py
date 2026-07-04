@@ -166,6 +166,15 @@ async def handle_download(job_id: int, params: dict) -> None:
             db.commit()
     await queue.update(job_id, status="done", progress_pct=100, message="Done")
 
+    # One-click Auto-Clip URL flow: chain the pipeline once the download lands.
+    if params.get("then_autoclip"):
+        await queue.enqueue("autoclip", {"source_id": source_id,
+                                         "n": params.get("n", 10),
+                                         "exclusions": params.get("exclusions", []),
+                                         "brandkit_id": params.get("brandkit_id"),
+                                         "preset_id": params.get("preset_id")},
+                            source_id=source_id)
+
 
 def register() -> None:
     from ..queue import register_handler

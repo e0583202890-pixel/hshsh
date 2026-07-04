@@ -53,33 +53,29 @@ def smooth(samples: list[tuple[float, float]], window: int = 7) -> list[tuple[fl
     return [(samples[i][0], float(smoothed[i])) for i in range(len(samples))]
 
 
-def build_sendcmd(samples: list[tuple[float, float]], src_w: int, src_h: int,
-                  out_path: Path) -> tuple[str, str] | None:
-    """Write a sendcmd file driving the crop x over time.
+def face_centered_crop(samples: list[tuple[float, float]], src_w: int, src_h: int) -> str | None:
+    """Static 9:16 crop centered on the MEDIAN smoothed face x.
 
-    Returns (filter_str, sendcmd_path) or None if no samples (caller falls
-    back to static center crop).
+    A time-varying sendcmd crop is fragile across ffmpeg builds; a median-
+    centered crop keeps the face reliably in frame and never fails the render.
+    Returns None if there are no face samples (caller uses center crop).
     """
     if not samples:
         return None
     crop_w = int(src_h * 9 / 16)
-    max_x = max(0, src_w - crop_w)
-    lines = []
-    for t, cx in samples:
-        x = int(np.clip(cx * src_w - crop_w / 2, 0, max_x))
-        lines.append(f"{t:.2f} crop x {x};")
-    out_path.write_text("\n".join(lines), encoding="utf-8")
-    filt = (f"sendcmd=f='{out_path.as_posix()}',"
-            f"crop=w={crop_w}:h={src_h}:x={max_x // 2}:y=0,"
-            f"scale=1080:1920,format=yuv420p")
-    return filt, str(out_path)
+    if crop_w >= src_w:
+        return None  # already narrower than 9:16 -> center crop handles it
+    max_x = src_w - crop_w
+    median_cx = float(np.median([cx for _, cx in samples]))
+    x = int(np.clip(median_cx * src_w - crop_w / 2, 0, max_x))
+    return f"crop={crop_w}:{src_h}:{x}:0,scale=1080:1920,format=yuv420p"
 
 
 async def auto_reframe_filter(video_path: str, src_w: int, src_h: int,
                               work_dir: Path) -> str:
     samples = smooth(await face_track(video_path))
-    result = build_sendcmd(samples, src_w, src_h, work_dir / "reframe_cmd.txt")
-    if result:
-        return result[0]
+    filt = face_centered_crop(samples, src_w, src_h)
+    if filt:
+        return filt
     logger.info("no face found - falling back to static center crop")
     return "crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=1080:1920,format=yuv420p"

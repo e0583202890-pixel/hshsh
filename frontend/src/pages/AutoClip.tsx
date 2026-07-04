@@ -1,13 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api, mediaUrl } from '../lib/api'
 import { onWs } from '../lib/ws'
 import { useI18n } from '../i18n'
 import StatusBadge from '../components/StatusBadge'
 import ViralityScore from '../components/ViralityScore'
 
+const SIGNAL_META: Record<string, { icon: string; key: string }> = {
+  audio_hype_windows: { icon: '🔊', key: 'audio hype' },
+  chat_spike_windows: { icon: '💬', key: 'chat spike' },
+  scene_changes: { icon: '🎬', key: 'scene change' },
+  face_reactions: { icon: '😲', key: 'face reaction' },
+}
+
 export default function AutoClip() {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const [sources, setSources] = useState<any[]>([])
   const [sourceId, setSourceId] = useState<number | ''>('')
   const [url, setUrl] = useState('')
@@ -15,6 +23,8 @@ export default function AutoClip() {
   const [exclusions, setExclusions] = useState('')
   const [clips, setClips] = useState<any[]>([])
   const [msg, setMsg] = useState('')
+  const [signals, setSignals] = useState<any>(null)
+  const [signalsBusy, setSignalsBusy] = useState(false)
 
   const refresh = () => {
     api.get('/sources').then((s) => setSources(s.filter((x: any) => x.status === 'done'))).catch(() => {})
@@ -38,6 +48,28 @@ export default function AutoClip() {
       setMsg(res.note || `Job #${res.job_id ?? res.download_job_id} started`)
     } catch (e: any) { setMsg(e.message) }
   }
+
+  const computeSignals = async () => {
+    if (!sourceId) return
+    setSignalsBusy(true); setSignals(null)
+    try { setSignals(await api.post(`/sources/${sourceId}/signals`)) }
+    catch (e: any) { setMsg(e.message) }
+    setSignalsBusy(false)
+  }
+
+  const createClipAt = async (t0: number) => {
+    if (!sourceId) return
+    const res = await api.post('/clips', {
+      source_id: sourceId, start_sec: Math.max(0, t0 - 15), end_sec: t0 + 15, title: '',
+    })
+    navigate(`/editor/${res.id}`)
+  }
+
+  const signalRows: { t: number; kind: string }[] = signals
+    ? Object.entries(SIGNAL_META).flatMap(([field, meta]) =>
+        (signals[field] || []).map((p: any) => ({ t: p.t, kind: meta.key })))
+        .sort((a, b) => a.t - b.t)
+    : []
 
   const sorted = [...clips].sort((a, b) => (b.virality_score ?? 0) - (a.virality_score ?? 0))
 
@@ -73,6 +105,37 @@ export default function AutoClip() {
           {msg && <p className="text-sm text-amber-200">{msg}</p>}
         </div>
       </div>
+
+      {sourceId && (
+        <section className="card">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="font-bold">📈 {t('autoclip.signals')}</h2>
+            <button className="btn-secondary" onClick={computeSignals} disabled={signalsBusy}>
+              {signalsBusy ? '⏳' : '📊'} {t('autoclip.signals')}
+            </button>
+          </div>
+          {signalRows.length > 0 && (
+            <div className="max-h-56 space-y-1 overflow-y-auto">
+              {signalRows.map((r, i) => (
+                <div key={i} className="flex items-center justify-between rounded bg-slate-800 px-2 py-1 text-sm">
+                  <span>
+                    {Object.values(SIGNAL_META).find((m) => m.key === r.kind)?.icon} {r.kind}
+                    <span className="ms-2 tabular-nums text-slate-400" dir="ltr">
+                      {Math.floor(r.t / 60)}:{String(Math.floor(r.t % 60)).padStart(2, '0')}
+                    </span>
+                  </span>
+                  <button className="btn-secondary text-xs" onClick={() => createClipAt(r.t)}>
+                    ✂ ±15s → {t('nav.editor')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {signals && signalRows.length === 0 && (
+            <p className="text-sm text-slate-400">—</p>
+          )}
+        </section>
+      )}
 
       <section>
         <div className="mb-2 flex items-center justify-between">

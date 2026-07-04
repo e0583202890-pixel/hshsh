@@ -48,13 +48,30 @@ export default function Editor() {
   const vw = source?.width || 1920
   const vh = source?.height || 1080
 
+  // Keyboard-driven editor: Space play/pause, I/O mark in/out, J/L seek.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const v = videoRef.current
+      if (!v) return
+      if (e.key === ' ') { e.preventDefault(); v.paused ? v.play() : v.pause() }
+      else if (e.key === 'i' || e.key === 'I') setInSec(v.currentTime)
+      else if (e.key === 'o' || e.key === 'O') setOutSec(v.currentTime)
+      else if (e.key === 'j' || e.key === 'J') v.currentTime = Math.max(0, v.currentTime - 5)
+      else if (e.key === 'l' || e.key === 'L') v.currentTime = v.currentTime + 5
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const save = async (fn: () => Promise<any>, okMsg = '✔') => {
     try { await fn(); setMsg(okMsg) } catch (e: any) { setMsg(`⊗ ${e.message}`) }
   }
 
   const saveTrim = () => save(async () => {
-    // Trim is stored on the clip via create/update; here we PATCH via vertical params refresh
     if (!clip) return
+    await api.patch(`/clips/${clip.id}`, { start_sec: inSec, end_sec: outSec, title: clip.title })
     await api.post(`/clips/${clip.id}/vertical`, { mode, params: verticalParams() })
   })
 
@@ -152,6 +169,9 @@ export default function Editor() {
 
         {tab === 'trim' && (
           <div className="space-y-2">
+            <p className="text-xs text-slate-400" dir="ltr">
+              ⌨ Space play/pause · I/O mark in/out · J/L −5s/+5s
+            </p>
             <button className="btn w-full justify-center" onClick={saveTrim}>💾 {t('common.save')}</button>
           </div>
         )}

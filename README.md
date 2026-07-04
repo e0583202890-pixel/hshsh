@@ -93,7 +93,29 @@ run.ps1            one-command launcher
 
 Drop `Rubik.ttf` (or another Hebrew-glyph font, e.g. Noto Sans Hebrew) into
 `data/assets/fonts/` — burned-in captions use this fontsdir. Hebrew caption lines
-are prefixed with RLM (U+200F) so libass renders RTL correctly.
+are prefixed with RLM (U+200F) so libass renders RTL correctly. The branding text
+overlays (hook, `@kicklipsil` watermark, lower-third) use ffmpeg's `drawtext`,
+which the standard Windows ffmpeg builds include. If a machine's ffmpeg lacks
+`drawtext` or a usable font, the render **degrades gracefully** — you still get the
+vertical, captioned clip, just without the text overlays (a warning appears in the
+job message) rather than a failed render.
+
+## Editor keyboard shortcuts
+
+`Space` play/pause · `I` / `O` mark in / out · `J` / `L` seek −5s / +5s.
+
+## Nice extras beyond the base spec
+
+- **Live "clip last 60s" marks become draft clips** on the recording's source when
+  the stream ends — they're waiting in the Library/Editor, not just noted.
+- **Signals panel** on the Auto-Clip page: compute audio-hype / chat-spike /
+  scene-change / face-reaction windows and one-click "create clip here (±15s) →
+  editor" for any of them.
+- **One-click Auto-Clip from a URL**: pasting a VOD URL downloads it and then
+  auto-runs the AI pipeline in one go (chained jobs).
+- **Graceful degradation everywhere**: caption failure never kills an auto-build;
+  branding/font failure falls back to a captioned clip; a missing `ffprobe` is
+  tolerated. A clip always renders.
 
 ## All code / logs / filenames are English-only
 

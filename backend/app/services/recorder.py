@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..config import LOGS_DIR, RECORDINGS_DIR, settings
 from ..db import SessionLocal
-from ..models import Recording, Source, Streamer
+from ..models import Clip, Recording, Source, Streamer
 from ..queue import queue
 from ..ws import hub
 from .chat_capture import ChatCapture
@@ -80,34 +80,39 @@ class RecordingTask:
                 self.segments.append(seg)
                 await self._update_db(segment_count=len(self.segments))
                 await self._status("recording", f"Recording segment {len(self.segments)}")
-                rc = await self._record_segment(seg, log)
+                outcome = await self._record_segment(seg, log)
                 if self.stop_requested:
                     break
-                # streamlink exited while we didn't ask it to: reconnect if still live
-                if rc != 0 or True:
-                    attempt += 1
-                    self.reconnects += 1
-                    if attempt > MAX_RECONNECTS:
-                        await self._status("failed", "Too many reconnect attempts")
-                        break
-                    backoff = RECONNECT_BACKOFF_SEC[min(attempt - 1, len(RECONNECT_BACKOFF_SEC) - 1)]
-                    await self._status("recording", f"Stream dropped, reconnecting in {backoff}s "
-                                                    f"(attempt {attempt}/{MAX_RECONNECTS})")
-                    await asyncio.sleep(backoff)
-                    from .live_monitor import is_channel_live
-                    if not await is_channel_live(self.channel):
-                        break  # channel went offline: normal end
+                if outcome == "rotated":
+                    # Normal N-minute rotation: continue immediately, reset the
+                    # reconnect counter (the stream is healthy).
+                    attempt = 0
+                    continue
+                # streamlink exited on its own: the stream likely dropped. Reconnect
+                # if the channel is still live, otherwise treat it as a normal end.
+                from .live_monitor import is_channel_live
+                if not await is_channel_live(self.channel):
+                    break  # channel went offline: normal end
+                attempt += 1
+                self.reconnects += 1
+                if attempt > MAX_RECONNECTS:
+                    await self._status("failed", "Too many reconnect attempts")
+                    break
+                backoff = RECONNECT_BACKOFF_SEC[min(attempt - 1, len(RECONNECT_BACKOFF_SEC) - 1)]
+                await self._status("recording", f"Stream dropped, reconnecting in {backoff}s "
+                                                f"(attempt {attempt}/{MAX_RECONNECTS})")
+                await asyncio.sleep(backoff)
         finally:
             await self.chat.stop()
             await self._finish(chat_path)
 
-    async def _record_segment(self, seg: Path, log: Path) -> int:
+    async def _record_segment(self, seg: Path, log: Path) -> str:
+        """Record one segment. Returns 'rotated' (hit segment_time, healthy) or
+        'exited' (streamlink ended on its own -> possible drop)."""
         streamlink = settings.which("streamlink") or "streamlink"
-        segment_pattern = str(seg).replace("part", "part").replace(
-            f"part{len(self.segments) - 1:03d}", f"part{len(self.segments) - 1:03d}")
         cmd = [streamlink, f"kick.com/{self.channel}", "best",
                "--stream-segment-timeout", "30", "--retry-streams", "5",
-               "-o", segment_pattern]
+               "-o", str(seg)]
         with open(log, "a", encoding="utf-8") as f:
             self.proc = await asyncio.create_subprocess_exec(
                 *cmd, stdout=f, stderr=asyncio.subprocess.STDOUT)
@@ -117,8 +122,8 @@ class RecordingTask:
         except asyncio.TimeoutError:
             self.proc.terminate()
             await self.proc.wait()
-            return 0  # rotation, not an error
-        return self.proc.returncode or 0
+            return "rotated"
+        return "exited"
 
     async def _update_db(self, **fields) -> None:
         with SessionLocal() as db:
@@ -170,6 +175,17 @@ class RecordingTask:
                 db.add(src)
                 db.commit()
                 source_id = src.id
+                # Turn "clip last N seconds" live marks into draft clips on the source.
+                marks = json.loads(rec.clip_marks_json or "[]") if rec else []
+                for mark in marks:
+                    start = max(0.0, float(mark.get("t", 0)))
+                    end = min(info.get("duration_sec") or start + mark.get("seconds", 60),
+                              start + mark.get("seconds", 60))
+                    if end > start:
+                        db.add(Clip(source_id=source_id, title="", start_sec=start,
+                                    end_sec=end, duration_sec=end - start,
+                                    vertical_mode="facecam_stack", status="draft"))
+                db.commit()
         await self._status("done" if ok else "failed", "Recording finished")
         if ok and source_id and self.auto_clip_on_end:
             await queue.enqueue("autoclip", {"source_id": source_id, "n": 10}, source_id=source_id)
