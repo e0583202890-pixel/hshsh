@@ -24,12 +24,13 @@ async def _tool_version(cmd: list[str]) -> bool:
 async def health_report() -> dict:
     checks: dict[str, dict] = {}
 
-    for tool, hint in (("ffmpeg", "Install ffmpeg and add it to PATH"),
-                       ("ffprobe", "ffprobe ships with ffmpeg"),
-                       ("yt-dlp", "pip install yt-dlp"),
-                       ("streamlink", "pip install streamlink")):
+    # ffmpeg/ffprobe use "-version" (single dash); yt-dlp/streamlink use "--version".
+    for tool, flag, hint in (("ffmpeg", "-version", "Optional: install full ffmpeg for text overlays; a basic one is bundled"),
+                             ("ffprobe", "-version", "ffprobe ships with a full ffmpeg install (optional)"),
+                             ("yt-dlp", "--version", "pip install yt-dlp"),
+                             ("streamlink", "--version", "pip install streamlink")):
         path = settings.which(tool) or shutil.which(tool)
-        ok = bool(path) and await _tool_version([path, "--version"])
+        ok = bool(path) and await _tool_version([path, flag])
         checks[tool] = {"ok": ok, "path": path or "", "hint": "" if ok else hint}
 
     for mod, key, hint in (("curl_cffi", "curl_cffi", "pip install curl_cffi (Kick impersonation)"),

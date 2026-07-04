@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -51,9 +52,32 @@ class Settings:
     ui_language: str = _env("UI_LANGUAGE", "he")
 
     def which(self, tool: str) -> str | None:
-        """Resolve a tool path: explicit override first, then PATH lookup."""
+        """Resolve a tool path.
+
+        Order: explicit .env override -> PATH -> the venv's Scripts/bin dir (where
+        pip-installed console tools like yt-dlp/streamlink live) -> for ffmpeg, a
+        bundled binary via imageio-ffmpeg so video works without a manual install.
+        """
         override = getattr(self, f"{tool.replace('-', '')}_path", None) or tool
-        return shutil.which(override) or (override if Path(override).exists() else None)
+        found = shutil.which(override)
+        if found:
+            return found
+        if Path(override).exists():
+            return str(override)
+        # Look next to the running Python (venv Scripts on Windows, bin on POSIX).
+        venv_dir = Path(sys.executable).parent
+        for name in (tool, f"{tool}.exe"):
+            cand = venv_dir / name
+            if cand.exists():
+                return str(cand)
+        # Last resort for ffmpeg: use the binary bundled with imageio-ffmpeg.
+        if tool == "ffmpeg":
+            try:
+                import imageio_ffmpeg
+                return imageio_ffmpeg.get_ffmpeg_exe()
+            except Exception:  # noqa: BLE001 - not installed / unavailable
+                return None
+        return None
 
 
 settings = Settings()
