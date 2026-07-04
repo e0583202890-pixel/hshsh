@@ -212,8 +212,13 @@ def preflight(clip_id: int, db: Session = Depends(get_db)):
 def get_settings(db: Session = Depends(get_db)):
     from ..config import settings as cfg
     stored = {s.key: s.value for s in db.query(Setting).all()}
+    from ..services import llm
     return {"anthropic_model": cfg.anthropic_model,
             "anthropic_key_set": bool(cfg.anthropic_api_key),
+            "openrouter_model": cfg.openrouter_model,
+            "openrouter_key_set": bool(cfg.openrouter_api_key),
+            "llm_provider": llm.provider() or "none",
+            "llm_model": llm.active_model() if llm.provider() else "",
             "whisper_model": cfg.whisper_model, "whisper_device": cfg.whisper_device,
             "live_poll_interval_sec": cfg.live_poll_interval_sec,
             "disk_min_free_gb": cfg.disk_min_free_gb,
@@ -241,6 +246,8 @@ def put_settings(body: dict, db: Session = Depends(get_db)):
             cfg.whisper_model = str(value)
         elif key == "anthropic_model":
             cfg.anthropic_model = str(value)
+        elif key == "openrouter_model":
+            cfg.openrouter_model = str(value)
     db.commit()
     return {"ok": True}
 

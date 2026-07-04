@@ -55,8 +55,13 @@ async def health_report() -> dict:
     checks["cuda"] = {"ok": cuda_ok,
                       "hint": "" if cuda_ok else "Optional: NVIDIA CUDA for fast Whisper"}
 
-    key_ok = bool(settings.anthropic_api_key)
-    checks["anthropic_key"] = {"ok": key_ok,
-                               "hint": "" if key_ok else "Set ANTHROPIC_API_KEY in .env"}
+    from . import llm
+    prov = llm.provider()
+    checks["llm_api"] = {
+        "ok": prov is not None,
+        "provider": prov or "none",
+        "model": llm.active_model() if prov else "",
+        "hint": "" if prov else "Set OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) in .env",
+    }
     return {"checks": checks, "all_ok": all(c["ok"] for k, c in checks.items()
                                             if k not in ("cuda",))}

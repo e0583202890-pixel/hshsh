@@ -1,13 +1,12 @@
-"""Per-platform Hebrew title/description/hashtags generation (Anthropic)."""
+"""Per-platform Hebrew title/description/hashtags generation (OpenRouter/Anthropic)."""
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 
-from ..config import settings
 from ..db import SessionLocal
 from ..models import Clip, Source, Streamer
+from . import llm
 from .ai_clipper import safe_json
 
 log = logging.getLogger("metadata_ai")
@@ -39,21 +38,11 @@ async def generate_metadata(clip_id: int, platform: str) -> dict:
             transcript = " ".join(s.get("text", "") for s in segs
                                   if clip.start_sec - 2 <= s.get("start", 0) <= clip.end_sec + 2)[:6000]
 
-    def _blocking() -> str:
-        import anthropic
-        if not settings.anthropic_api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY is not set")
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        resp = client.messages.create(
-            model=settings.anthropic_model, max_tokens=1024, system=SYSTEM,
-            messages=[{"role": "user", "content": USER.format(
-                display_name=display_name, platform=platform,
-                clip_transcript=transcript or "(no transcript)", hook=hook,
-                context_notes=context_notes or "none")}])
-        return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
-
+    user = USER.format(display_name=display_name, platform=platform,
+                       clip_transcript=transcript or "(no transcript)", hook=hook,
+                       context_notes=context_notes or "none")
     for _ in range(2):
-        raw = await asyncio.to_thread(_blocking)
+        raw = await llm.complete(SYSTEM, user, max_tokens=1024)
         parsed = safe_json(raw)
         if parsed and "title_he" in parsed:
             return parsed

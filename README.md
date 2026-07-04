@@ -56,7 +56,14 @@ first run, copies `.env.example` to `.env` if missing, then starts:
 - Backend (FastAPI): http://127.0.0.1:8123
 - Frontend (Vite dev): http://127.0.0.1:5173
 
-Put your `ANTHROPIC_API_KEY` in `.env` (never echoed to the UI).
+Put your AI key in `.env` (never echoed to the UI). Two options — set **either**:
+
+- `OPENROUTER_API_KEY` (+ optional `OPENROUTER_MODEL`, default
+  `anthropic/claude-3.5-sonnet`) — one key, routes to Claude/GPT/others. If both
+  keys are set, OpenRouter wins.
+- `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`) — Anthropic native.
+
+The active provider + model is shown on the Settings page and in the health row.
 
 For a production-style single-server run, build the frontend once
 (`cd frontend && npm run build`) — the backend then serves the built app itself

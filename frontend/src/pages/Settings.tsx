@@ -21,6 +21,7 @@ export default function Settings() {
         disk_min_free_gb: form.disk_min_free_gb,
         whisper_model: form.whisper_model,
         anthropic_model: form.anthropic_model,
+        openrouter_model: form.openrouter_model,
         auto_purge_sources: form.auto_purge_sources,
         ui_language: lang,
       })
@@ -58,11 +59,23 @@ export default function Settings() {
           <p className="mt-1 text-xs text-slate-400">large-v3 = best Hebrew, heavy GPU</p>
         </div>
         <div>
-          <label className="label">{t('settings.anthropic_model')}</label>
-          <input className="input w-full" dir="ltr" value={form.anthropic_model || ''}
-                 onChange={(e) => setForm({ ...form, anthropic_model: e.target.value })} />
+          <label className="label">
+            🤖 LLM {settings.llm_provider !== 'none' ? `(${settings.llm_provider})` : ''}
+          </label>
+          {settings.openrouter_key_set ? (
+            <input className="input w-full" dir="ltr" value={form.openrouter_model || ''}
+                   placeholder="anthropic/claude-3.5-sonnet"
+                   onChange={(e) => setForm({ ...form, openrouter_model: e.target.value })} />
+          ) : (
+            <input className="input w-full" dir="ltr" value={form.anthropic_model || ''}
+                   onChange={(e) => setForm({ ...form, anthropic_model: e.target.value })} />
+          )}
           <p className="mt-1 text-xs text-slate-400">
-            API key: {settings.anthropic_key_set ? `✔ ${t('settings.detected')}` : `⊗ .env ANTHROPIC_API_KEY`}
+            {settings.llm_provider === 'openrouter'
+              ? `✔ OpenRouter · ${settings.llm_model}`
+              : settings.llm_provider === 'anthropic'
+              ? `✔ Anthropic · ${settings.llm_model}`
+              : '⊗ .env OPENROUTER_API_KEY or ANTHROPIC_API_KEY'}
           </p>
         </div>
         <div>

@@ -28,8 +28,13 @@ def _env(key: str, default: str = "") -> str:
 
 
 class Settings:
+    # LLM: either Anthropic native OR OpenRouter (OpenAI-compatible). Auto-detected;
+    # OpenRouter takes priority if its key is present.
     anthropic_api_key: str = _env("ANTHROPIC_API_KEY")
     anthropic_model: str = _env("ANTHROPIC_MODEL", "claude-sonnet-5")
+    openrouter_api_key: str = _env("OPENROUTER_API_KEY")
+    openrouter_model: str = _env("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")
+    openrouter_base_url: str = _env("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
     whisper_model: str = _env("WHISPER_MODEL", "small")
     whisper_device: str = _env("WHISPER_DEVICE", "auto")  # auto -> cuda then cpu
     whisper_compute_type: str = _env("WHISPER_COMPUTE_TYPE", "auto")

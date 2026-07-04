@@ -16,6 +16,7 @@ from ..config import settings
 from ..db import SessionLocal
 from ..models import AiRun, BrandKit, Clip, Preset, Source, Streamer
 from ..queue import queue
+from . import llm
 from .signals import analyze_source, signals_near
 from .transcribe import transcribe_source
 
@@ -55,25 +56,14 @@ def safe_json(raw: str) -> dict | None:
         return None
 
 
-def _client():
-    import anthropic
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set")
-    return anthropic.Anthropic(api_key=settings.anthropic_api_key)
-
-
-async def _ask_claude(system: str, user: str) -> dict | None:
-    def _blocking() -> str:
-        client = _client()
-        resp = client.messages.create(
-            model=settings.anthropic_model, max_tokens=4096,
-            system=system, messages=[{"role": "user", "content": user}])
-        return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+async def _ask_llm(system: str, user: str) -> dict | None:
+    """Call the configured LLM (OpenRouter or Anthropic). Returns parsed JSON or
+    None (API down / malformed twice) so callers degrade to signal-only."""
     for attempt in range(2):  # retry once on malformed output
         try:
-            raw = await asyncio.to_thread(_blocking)
+            raw = await llm.complete(system, user, max_tokens=4096)
         except Exception as exc:  # noqa: BLE001 - API down -> caller degrades
-            log.warning("anthropic call failed: %s", exc)
+            log.warning("LLM call failed: %s", exc)
             return None
         parsed = safe_json(raw)
         if parsed is not None:
@@ -170,7 +160,7 @@ async def handle_autoclip(job_id: int, params: dict) -> None:
             transcript_segments=json.dumps(chunk, ensure_ascii=False),
             signals=json.dumps(signals, ensure_ascii=False)[:8000],
             exclusions=json.dumps(exclusions, ensure_ascii=False), n=n)
-        parsed = await _ask_claude(HIGHLIGHT_SYSTEM, user)
+        parsed = await _ask_llm(HIGHLIGHT_SYSTEM, user)
         if parsed and isinstance(parsed.get("clips"), list):
             candidates.extend(parsed["clips"])
     if not candidates:
@@ -188,7 +178,7 @@ async def handle_autoclip(job_id: int, params: dict) -> None:
     candidates = candidates[:n]
 
     with SessionLocal() as db:
-        db.add(AiRun(source_id=source_id, model=settings.anthropic_model,
+        db.add(AiRun(source_id=source_id, model=llm.active_model(),
                      n_requested=n, n_returned=len(candidates),
                      params_json=json.dumps(params)))
         db.commit()
