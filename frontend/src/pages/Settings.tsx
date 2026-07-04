@@ -64,7 +64,7 @@ export default function Settings() {
           </label>
           {settings.openrouter_key_set ? (
             <input className="input w-full" dir="ltr" value={form.openrouter_model || ''}
-                   placeholder="anthropic/claude-3.5-sonnet"
+                   placeholder="deepseek/deepseek-chat"
                    onChange={(e) => setForm({ ...form, openrouter_model: e.target.value })} />
           ) : (
             <input className="input w-full" dir="ltr" value={form.anthropic_model || ''}
@@ -77,6 +77,18 @@ export default function Settings() {
               ? `✔ Anthropic · ${settings.llm_model}`
               : '⊗ .env OPENROUTER_API_KEY or ANTHROPIC_API_KEY'}
           </p>
+          {settings.openrouter_key_set && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {['deepseek/deepseek-chat', 'qwen/qwen-2.5-72b-instruct', 'z-ai/glm-4.5-air',
+                'anthropic/claude-3.5-sonnet'].map((mdl) => (
+                <button key={mdl} type="button"
+                        className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300 hover:bg-slate-700"
+                        dir="ltr" onClick={() => setForm({ ...form, openrouter_model: mdl })}>
+                  {mdl.split('/')[1]}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <label className="label">{t('settings.poll_interval')}</label>

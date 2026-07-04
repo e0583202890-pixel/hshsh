@@ -58,9 +58,12 @@ first run, copies `.env.example` to `.env` if missing, then starts:
 
 Put your AI key in `.env` (never echoed to the UI). Two options — set **either**:
 
-- `OPENROUTER_API_KEY` (+ optional `OPENROUTER_MODEL`, default
-  `anthropic/claude-3.5-sonnet`) — one key, routes to Claude/GPT/others. If both
-  keys are set, OpenRouter wins.
+- `OPENROUTER_API_KEY` (+ optional `OPENROUTER_MODEL`) — one key, many models. The
+  default `deepseek/deepseek-chat` (DeepSeek V3) is a **cheap** pick (~40-50x
+  cheaper than Claude, good JSON, decent Hebrew). Other cheap options:
+  `qwen/qwen-2.5-72b-instruct`, `z-ai/glm-4.5-air`, `deepseek/deepseek-r1`, or a
+  free `:free` slug. Bump to `anthropic/claude-3.5-sonnet` / `openai/gpt-4o` only
+  if Hebrew titles come out weak. If both keys are set, OpenRouter wins.
 - `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`) — Anthropic native.
 
 The active provider + model is shown on the Settings page and in the health row.
