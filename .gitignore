@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+backend/.venv/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Env / secrets
+.env
+
+# Data (recordings, downloads, renders, DB)
+data/kicklips.db
+data/recordings/*
+data/downloads/*
+data/work/*
+data/output/*
+data/logs/*
+!data/recordings/.gitkeep
+!data/downloads/.gitkeep
+!data/work/.gitkeep
+!data/output/.gitkeep
